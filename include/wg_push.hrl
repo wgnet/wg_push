@@ -1,3 +1,5 @@
 -type(device_token() :: binary()).
 
--type(ssl_service() :: {ssl:host(), integer()}).
+-type(inet_service() :: {inet:hostname(), inet:port_number()}).
+
+-type(ssl_options() :: [proplists:property()]).

@@ -5,14 +5,14 @@
 -include("wg_push.hrl").
 
 
--spec send(binary(), device_token(), ssl_service(), ssl:path(), string()) ->
+-spec send(binary(), device_token(), inet_service(), file:filename(), string()) ->
              ok | {error, message_too_big} | {error, term()}.
-send(Msg, DeviceToken, SSL_Service, CertFile, Password) ->
-    send(Msg, DeviceToken, SSL_Service,
+send(Msg, DeviceToken, Service, CertFile, Password) ->
+    send(Msg, DeviceToken, Service,
          [{certfile, CertFile}, {password, Password}]).
 
 
--spec send(binary(), device_token(), ssl_service(), [ssl:ssloption()]) ->
+-spec send(binary(), device_token(), inet_service(), ssl_options()) ->
              ok | {error, message_too_big} | {error, term()}.
 send(Msg, DeviceToken, {Host, Port}, SSL_Options) ->
     MSize = byte_size(Msg),
@@ -29,12 +29,12 @@ send(Msg, DeviceToken, {Host, Port}, SSL_Options) ->
     end.
 
 
--spec get_feedback(ssl_service(), ssl:path(), string()) -> {ok, [device_token()]} | {error, term()}.
-get_feedback(SSL_Service, Certfile, Password) ->
-    get_feedback(SSL_Service, [{certfile, Certfile}, {password, Password}]).
+-spec get_feedback(inet_service(), file:filename(), string()) -> {ok, [device_token()]} | {error, term()}.
+get_feedback(Service, CertFile, Password) ->
+    get_feedback(Service, [{certfile, CertFile}, {password, Password}]).
 
 
--spec get_feedback(ssl_service(), ssl:ssloptions()) -> {ok, [device_token()]} | {error, term()}.
+-spec get_feedback(inet_service(), ssl_options()) -> {ok, [device_token()]} | {error, term()}.
 get_feedback({Host, Port}, SSL_Options) ->
     case ssl:connect(Host, Port, SSL_Options) of
         {ok, Socket} -> Data = read_feedback([]),
