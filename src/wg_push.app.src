@@ -1,7 +1,7 @@
 %% -*- mode: Erlang;-*-
 {application, wg_push,
  [
-  {description, ""},
+  {description, "working with Apple Push Notification Service"},
   {vsn, "1"},
   {registered, []},
   {applications, [kernel, stdlib]},

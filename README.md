@@ -1,3 +1,3 @@
 # wg_push
 
-project description here
+Erlang library for working with Apple Push Notification Service
