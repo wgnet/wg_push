@@ -1,4 +1,4 @@
--type(device_token() :: binary()).
+-type(device_token() :: {integer(), binary()}).
 
 -type(inet_service() :: {inet:hostname(), inet:port_number()}).
 

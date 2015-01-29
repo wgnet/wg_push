@@ -1,19 +1,11 @@
 -module(wg_apns_push).
 
--export([send/4, send/5, get_feedback/2, get_feedback/3]).
+-export([send/4, get_feedback/2]).
 
 -include("wg_push.hrl").
 
 
--spec send(binary(), device_token(), inet_service(), file:filename(), string()) ->
-             ok | {error, message_too_big} | {error, term()}.
-send(Msg, DeviceToken, Service, CertFile, Password) ->
-    send(Msg, DeviceToken, Service,
-         [{certfile, CertFile}, {password, Password}]).
-
-
--spec send(binary(), device_token(), inet_service(), ssl_options()) ->
-             ok | {error, message_too_big} | {error, term()}.
+-spec send(binary(), device_token(), inet_service(), ssl_options()) -> ok | {error, term()}.
 send(Msg, DeviceToken, {Host, Port}, SSL_Options) ->
     MSize = byte_size(Msg),
     if
@@ -29,17 +21,12 @@ send(Msg, DeviceToken, {Host, Port}, SSL_Options) ->
     end.
 
 
--spec get_feedback(inet_service(), file:filename(), string()) -> {ok, [device_token()]} | {error, term()}.
-get_feedback(Service, CertFile, Password) ->
-    get_feedback(Service, [{certfile, CertFile}, {password, Password}]).
-
-
 -spec get_feedback(inet_service(), ssl_options()) -> {ok, [device_token()]} | {error, term()}.
 get_feedback({Host, Port}, SSL_Options) ->
     case ssl:connect(Host, Port, SSL_Options) of
         {ok, Socket} -> Data = read_feedback([]),
                         ssl:close(Socket),
-                        Tokens = get_tokens(Data, []),
+                        Tokens = parse_tokens(Data, []),
                         {ok, Tokens};
         {error, Error} -> {error, Error}
     end.
@@ -53,10 +40,10 @@ read_feedback(Data) ->
     end.
 
 
--spec get_tokens(binary(), list()) -> [device_token()].
-get_tokens(Data, Tokens) ->
+-spec parse_tokens(binary(), list()) -> [device_token()].
+parse_tokens(Data, Tokens) ->
     case Data of
-        <<_Time:32, Size:16/integer, Token:Size/binary, Rest/binary>> ->
-            get_tokens(Rest, [Token|Tokens]);
+        <<Time:32, Size:16/integer, Token:Size/binary, Rest/binary>> ->
+            parse_tokens(Rest, [{Time, Token} | Tokens]);
         _ -> Tokens
     end.
