@@ -1,7 +1,7 @@
 build:
 	erlc apns_emulator.erl
 
-start-emulator:
+start-emulator: build
 	erl -detached \
 	-name apns_emulator@127.0.0.1 \
 	-setcookie apns \
