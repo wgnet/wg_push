@@ -2,9 +2,8 @@
 {application, wg_push,
  [
   {description, "working with Apple Push Notification Service"},
-  {vsn, "1"},
+  {vsn, "1.2"},
   {registered, []},
   {applications, [kernel, stdlib]},
-  {mod, {wg_push_app, []}},
   {env, []}
  ]}.
