@@ -54,7 +54,11 @@ apns_push(_Config) ->
     Msg = <<"{\"aps\":{\"alert\":\"Hello\",\"badge\":9,\"sound\":\"bingbong.aiff\"},\"param1\":\"value1\",\"param2\":42}">>,
     Token = 16#5382f77562ae26b3ef1ef906cbca99cafe3213d123543dd0f2c6a3e20adf1a61,
     BinToken = <<Token:256/integer>>,
-    Res = wg_apns_push:send(Msg, BinToken, {"localhost", 2195}, ssl_options()),
+
+    {Mega, Sec, _Micro} = erlang:now(),
+    ExpirationDate = Mega * 1000000 + Sec,
+
+    Res = wg_apns_push:send(Msg, BinToken, {"localhost", 2195}, ssl_options(), ExpirationDate),
     ct:pal("wgn_apns_push:send res:~p", [Res]),
     ok = Res,
     ok.
