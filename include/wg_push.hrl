@@ -1,5 +1,12 @@
--type(device_token() :: {integer(), binary()}).
+-record(wg_push_item, {
+          id :: integer(),
+          device_token :: binary(),
+          payload :: binary(),
+          expiration_date :: integer(),
+          priority = 5 :: integer()
+         }).
 
--type(inet_service() :: {inet:hostname(), inet:port_number()}).
-
--type(ssl_options() :: [proplists:property()]).
+-record(wg_push_ssl_options, {
+          certfile :: file:name_all(),
+          keyfile :: file:name_all()
+         }).

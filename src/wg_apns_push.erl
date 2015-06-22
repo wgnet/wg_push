@@ -5,11 +5,9 @@
 -include("wg_push.hrl").
 
 
--spec send(binary(), device_token(), inet_service(), ssl_options()) -> ok | {error, term()}.
 send(Msg, DeviceToken, {Host, Port}, SSL_Options) ->
     send(Msg, DeviceToken, {Host, Port}, SSL_Options, 0).
 
--spec send(binary(), device_token(), inet_service(), ssl_options(), integer()) -> ok | {error, term()}.
 send(Msg, DeviceToken, {Host, Port}, SSL_Options, ExpirationDate) ->
     MSize = byte_size(Msg),
     if
@@ -31,7 +29,6 @@ send(Msg, DeviceToken, {Host, Port}, SSL_Options, ExpirationDate) ->
     end.
 
 
--spec get_feedback(inet_service(), ssl_options()) -> {ok, [device_token()]} | {error, term()}.
 get_feedback({Host, Port}, SSL_Options) ->
     case ssl:connect(Host, Port, SSL_Options) of
         {ok, Socket} -> Data = read_reply([]),
@@ -50,7 +47,6 @@ read_reply(Data) ->
     end.
 
 
--spec parse_tokens(binary(), list()) -> [device_token()].
 parse_tokens(Data, Tokens) ->
     case Data of
         <<Time:32, Size:16/integer, Token:Size/binary, Rest/binary>> ->

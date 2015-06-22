@@ -2,8 +2,11 @@
 {application, wg_push,
  [
   {description, "working with Apple Push Notification Service"},
-  {vsn, "1.2"},
+  {vsn, "2.0"},
   {registered, []},
   {applications, [kernel, stdlib]},
-  {env, []}
+  {mod, {wg_push_app, []}},
+  {env, [{num_items_to_send, 10},
+         {wait_for_items_timeout, 20} % seconds
+        ]}
  ]}.
