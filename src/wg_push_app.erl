@@ -7,7 +7,7 @@
 -spec(start() -> ok).
 start() ->
     application:start(crypto),
-    application:start(ans1),
+    application:start(asn1),
     application:start(public_key),
     application:start(ssl),
     ok = application:start(wg_push),

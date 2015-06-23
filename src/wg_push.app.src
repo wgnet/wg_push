@@ -6,7 +6,7 @@
   {registered, []},
   {applications, [kernel, stdlib]},
   {mod, {wg_push_app, []}},
-  {env, [{num_items_to_send, 10},
-         {wait_for_items_timeout, 20} % seconds
+  {env, [{apns_host, "gateway.push.apple.com"},
+         {apns_port, 2195}
         ]}
  ]}.
