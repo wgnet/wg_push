@@ -37,10 +37,10 @@ send_message(SSL_Options) ->
 send_v1() ->
     Host = "gateway.push.apple.com",
     Port = 2195,
-    %% SSL_Options = [{certfile, "../../tmp/pc.pem"},
-    %%                {keyfile, "../../tmp/pk.pem"}],
-    SSL_Options = [{certfile, "test/server.crt"},
-                   {keyfile, "test/server.key"}],
+    SSL_Options = [{certfile, "../../tmp/pc.pem"},
+                   {keyfile, "../../tmp/pk.pem"}],
+    %% SSL_Options = [{certfile, "test/server.crt"},
+    %%                {keyfile, "test/server.key"}],
 
     case ssl:connect(Host, Port, SSL_Options) of
         {ok, Socket} ->

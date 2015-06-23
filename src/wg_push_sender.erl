@@ -84,7 +84,8 @@ get_connection(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile},
             Options = [{certfile, CertFile},
                        {keyfile, KeyFile},
                        %%{versions,['tlsv1.1']},
-                       {active, false}
+                       {active, false},
+                       binary
                       ],
             case ssl:connect(Host, Port, Options) of
                 {ok, Socket} ->
@@ -117,15 +118,15 @@ send(Socket, Message) ->
     end.
 
 
-parse_reply(<<8, 0, _NotificationID:4/binary>>) -> ok;
-parse_reply(<<8, 1, _NotificationID:4/binary>>) -> {error, processing_error};
-parse_reply(<<8, 2, _NotificationID:4/binary>>) -> {error, missing_device_token};
-parse_reply(<<8, 3, _NotificationID:4/binary>>) -> {error, missing_topic};
-parse_reply(<<8, 4, _NotificationID:4/binary>>) -> {error, missing_payload};
-parse_reply(<<8, 5, _NotificationID:4/binary>>) -> {error, invalid_token_size};
-parse_reply(<<8, 6, _NotificationID:4/binary>>) -> {error, invalid_topic_size};
-parse_reply(<<8, 7, _NotificationID:4/binary>>) -> {error, invalid_payload_size};
-parse_reply(<<8, 8, _NotificationID:4/binary>>) -> {error, invalid_token};
-parse_reply(<<8, 10, _NotificationID:4/binary>>) -> {error, shutdown}; %% TODO try to send later
-parse_reply(<<8, 255, _NotificationID:4/binary>>) -> {error, uknown_error};
+parse_reply(<<8, 0, _NotificationID/binary>>) -> ok;
+parse_reply(<<8, 1, _NotificationID/binary>>) -> {error, processing_error};
+parse_reply(<<8, 2, _NotificationID/binary>>) -> {error, missing_device_token};
+parse_reply(<<8, 3, _NotificationID/binary>>) -> {error, missing_topic};
+parse_reply(<<8, 4, _NotificationID/binary>>) -> {error, missing_payload};
+parse_reply(<<8, 5, _NotificationID/binary>>) -> {error, invalid_token_size};
+parse_reply(<<8, 6, _NotificationID/binary>>) -> {error, invalid_topic_size};
+parse_reply(<<8, 7, _NotificationID/binary>>) -> {error, invalid_payload_size};
+parse_reply(<<8, 8, _NotificationID/binary>>) -> {error, invalid_token};
+parse_reply(<<8, 10, _NotificationID/binary>>) -> {error, shutdown}; %% TODO try to send later
+parse_reply(<<8, 255, _NotificationID/binary>>) -> {error, uknown_error};
 parse_reply(_Any) -> {error, unknown_reply}.
