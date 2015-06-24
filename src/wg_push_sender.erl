@@ -108,7 +108,7 @@ get_connection(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile},
 -spec send(port(), [#wg_push_item{}]) -> ok | {error, term()}.
 send(Socket, Messages) ->
     case wg_push_pack:pack_items(Messages) of
-        {ok, Bin, []} ->
+        {ok, Bin} ->
             case ssl:send(Socket, Bin) of
                 ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
                           {ok, Bin2} -> parse_reply(Bin2); %% TODO close socket and open new one

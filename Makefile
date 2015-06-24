@@ -9,4 +9,4 @@ eunit:
 	rebar eunit skip_deps=true
 
 run:
-	erl -pa ebin -boot start_sasl -s wg_push_app start
+	erl -pa ebin -s wg_push_app start
