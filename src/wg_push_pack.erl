@@ -12,27 +12,22 @@
 
 -type(item_error() :: {error, byte(), atom()}).
 
--spec pack_items([#wg_push_item{}]) ->
-                        {ok, binary(), [item_error()]} |
-                        {error, [item_error()]} |
-                        {error, no_data}.
+-spec pack_items([#wg_push_item{}]) -> {ok, binary()} | item_error() | {error, no_data}.
 pack_items(Items) ->
     Len = length(Items),
-    pack_items(lists:zip(lists:seq(1, Len), Items), <<>>, []).
+    pack_items(lists:zip(lists:seq(1, Len), Items), <<>>).
 
 
-pack_items([], <<>>, []) -> {error, no_data};
+pack_items([], <<>>) -> {error, no_data};
 
-pack_items([], <<>>, Errors) -> {error, lists:reverse(Errors)};
-
-pack_items([], Data, Errors) ->
+pack_items([], Data) ->
     Size = byte_size(Data),
-    {ok, <<2, Size:32/integer, Data/binary>>, lists:reverse(Errors)};
+    {ok, <<2, Size:32/integer, Data/binary>>};
 
-pack_items([{Position, Item} | Rest], Data, Errors) ->
+pack_items([{Position, Item} | Rest], Data) ->
     case pack_item(Position, Item) of
-        {ok, Bin} -> pack_items(Rest, <<Data/binary, Bin/binary>>, Errors);
-        ItemError -> pack_items(Rest, Data, [ItemError | Errors])
+        {ok, Bin} -> pack_items(Rest, <<Data/binary, Bin/binary>>);
+        ItemError -> ItemError
     end.
 
 

@@ -3,7 +3,7 @@
 
 -include("wg_push.hrl").
 
--export([start_link/0, set_apns_host_port/2, send_message/2]).
+-export([start_link/0, set_apns_host_port/2, send_message/2, send_messages/2]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 -export([get_connection/2, send/2, parse_reply/1]). %% inner functions exported for testing
 
@@ -28,7 +28,12 @@ set_apns_host_port(Host, Port) ->
 
 -spec send_message(#wg_push_item{}, #wg_push_ssl_options{}) -> ok | {error, term()}.
 send_message(Message, SSL_Options) ->
-    gen_server:call(?MODULE, {send_message, Message, SSL_Options}).
+    send_messages([Message], SSL_Options).
+
+
+-spec send_messages([#wg_push_item{}], #wg_push_ssl_options{}) -> ok | {error, term()}.
+send_messages(Messages, SSL_Options) ->
+    gen_server:call(?MODULE, {send_messages, Messages, SSL_Options}).
 
 
 %%% gen_server API
@@ -45,10 +50,10 @@ handle_call({set_apns_host_port, Host, Port}, _From, State) ->
     {reply, ok, State2};
 
 
-handle_call({send_message, Message, SSL_Options}, _From, State) ->
+handle_call({send_messages, Messages, SSL_Options}, _From, State) ->
     {Reply, State3} =
         case get_connection(SSL_Options, State) of
-            {ok, Socket, State2} -> {send(Socket, Message), State2};
+            {ok, Socket, State2} -> {send(Socket, Messages), State2};
             {error, Reason} -> {{error, no_connection, Reason}, State}
         end,
     {reply, Reply, State3};
@@ -100,9 +105,9 @@ get_connection(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile},
     end.
 
 
--spec send(port(), #wg_push_item{}) -> ok | {error, term()}.
-send(Socket, Message) ->
-    case wg_push_pack:pack_items([Message]) of
+-spec send(port(), [#wg_push_item{}]) -> ok | {error, term()}.
+send(Socket, Messages) ->
+    case wg_push_pack:pack_items(Messages) of
         {ok, Bin, []} ->
             case ssl:send(Socket, Bin) of
                 ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
@@ -112,21 +117,19 @@ send(Socket, Message) ->
                 {error, timeout} -> ok; %% Message is sent successfully
                 {error, Reason} -> {error, Reason}
             end;
-        {error, _, Errors} ->
-            [{error, 1, Reason}] = Errors,
-            {error, Reason}
+        {error, Reason} -> {error, Reason}
     end.
 
 
-parse_reply(<<8, 0, _NotificationID/binary>>) -> ok;
-parse_reply(<<8, 1, _NotificationID/binary>>) -> {error, processing_error};
-parse_reply(<<8, 2, _NotificationID/binary>>) -> {error, missing_device_token};
-parse_reply(<<8, 3, _NotificationID/binary>>) -> {error, missing_topic};
-parse_reply(<<8, 4, _NotificationID/binary>>) -> {error, missing_payload};
-parse_reply(<<8, 5, _NotificationID/binary>>) -> {error, invalid_token_size};
-parse_reply(<<8, 6, _NotificationID/binary>>) -> {error, invalid_topic_size};
-parse_reply(<<8, 7, _NotificationID/binary>>) -> {error, invalid_payload_size};
-parse_reply(<<8, 8, _NotificationID/binary>>) -> {error, invalid_token};
-parse_reply(<<8, 10, _NotificationID/binary>>) -> {error, shutdown}; %% TODO try to send later
-parse_reply(<<8, 255, _NotificationID/binary>>) -> {error, uknown_error};
+parse_reply(<<8, 0, _ItemID/binary>>) -> ok;
+parse_reply(<<8, 1, _ItemID/binary>>) -> {error, processing_error};
+parse_reply(<<8, 2, _ItemID/binary>>) -> {error, missing_device_token};
+parse_reply(<<8, 3, _ItemID/binary>>) -> {error, missing_topic};
+parse_reply(<<8, 4, _ItemID/binary>>) -> {error, missing_payload};
+parse_reply(<<8, 5, _ItemID/binary>>) -> {error, invalid_token_size};
+parse_reply(<<8, 6, _ItemID/binary>>) -> {error, invalid_topic_size};
+parse_reply(<<8, 7, _ItemID/binary>>) -> {error, invalid_payload_size};
+parse_reply(<<8, 8, _ItemID/binary>>) -> {error, invalid_token};
+parse_reply(<<8, 10, _ItemID/binary>>) -> {error, shutdown}; %% TODO try to send later
+parse_reply(<<8, 255, _ItemID /binary>>) -> {error, uknown_error};
 parse_reply(_Any) -> {error, unknown_reply}.
