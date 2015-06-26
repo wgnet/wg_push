@@ -5,7 +5,6 @@
 
 
 pack_item_test() ->
-    Position = 9,
     DeviceToken = <<1,1,1,1,1,1,1,1,
                     2,2,2,2,2,2,2,2,
                     3,3,3,3,3,3,3,3,
@@ -19,10 +18,14 @@ pack_item_test() ->
                          payload = Payload,
                          expiration_date = EDate,
                          priority = Priority},
-    Size = 32 + 25 + 4 + 4 + 1,
-    Bin = <<Position:8/integer, Size:16/integer,
-            DeviceToken/binary, Payload/binary, Id:32/integer, EDate:32/integer, Priority:8/integer>>,
-    ?assertEqual({ok, Bin}, wg_push_pack:pack_item(Position, Item)),
+    Size = byte_size(Payload),
+    Bin = <<1,
+            0, 32, DeviceToken/binary,
+            2, Size:16/integer, Payload/binary,
+            3, 4, Id:32/integer,
+            4, 4, EDate:32/integer,
+            5, 1, Priority:8/integer>>,
+    ?assertEqual({ok, Bin}, wg_push_pack:pack_item(Item)),
 
     InvalidToken = <<1,2,3>>,
     Item2 = #wg_push_item{id = Id,
@@ -30,7 +33,7 @@ pack_item_test() ->
                           payload = Payload,
                           expiration_date = EDate,
                           priority = Priority},
-    ?assertEqual({error, Position, invalid_device_token}, wg_push_pack:pack_item(Position, Item2)),
+    ?assertEqual({error, Id, invalid_device_token}, wg_push_pack:pack_item(Item2)),
 
     InvalidPayload = lists:foldl(fun(Num, Acc) ->
                                          <<Acc/binary, Num:32/integer, DeviceToken/binary>>
@@ -42,7 +45,7 @@ pack_item_test() ->
                           payload = InvalidPayload,
                           expiration_date = EDate,
                           priority = Priority},
-    ?assertEqual({error, Position, payload_too_big}, wg_push_pack:pack_item(Position, Item3)),
+    ?assertEqual({error, Id, payload_too_big}, wg_push_pack:pack_item(Item3)),
     ok.
 
 
@@ -59,13 +62,13 @@ pack_items_test() ->
                           payload = Payload,
                           expiration_date = EDate,
                           priority = Priority},
-    {ok, Bin1} = wg_push_pack:pack_item(1, Item1),
+    {ok, Bin1} = wg_push_pack:pack_item(Item1),
     Item2 = #wg_push_item{id = 2,
                           device_token = DeviceToken,
                           payload = Payload,
                           expiration_date = EDate,
                           priority = Priority},
-    {ok, Bin2} = wg_push_pack:pack_item(2, Item2),
+    {ok, Bin2} = wg_push_pack:pack_item(Item2),
 
     Size1 = byte_size(Bin1),
     Res1 = <<2, Size1:32/integer, Bin1/binary>>,
@@ -83,6 +86,6 @@ pack_items_test() ->
                           expiration_date = EDate,
                           priority = Priority},
     ?assertEqual({error, 3, invalid_device_token}, wg_push_pack:pack_items([Item1, Item2, Item3])),
-    ?assertEqual({error, 2, invalid_device_token}, wg_push_pack:pack_items([Item2, Item3])),
-    ?assertEqual({error, 1, invalid_device_token}, wg_push_pack:pack_items([Item3])),
+    ?assertEqual({error, 3, invalid_device_token}, wg_push_pack:pack_items([Item2, Item3])),
+    ?assertEqual({error, 3, invalid_device_token}, wg_push_pack:pack_items([Item3])),
     ok.
