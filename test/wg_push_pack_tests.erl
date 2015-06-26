@@ -89,3 +89,48 @@ pack_items_test() ->
     ?assertEqual({error, 3, invalid_device_token}, wg_push_pack:pack_items([Item2, Item3])),
     ?assertEqual({error, 3, invalid_device_token}, wg_push_pack:pack_items([Item3])),
     ok.
+
+
+build_ssl_options_test() ->
+    ?assertEqual([], wg_push_pack:build_ssl_options(#wg_push_ssl_options{})),
+    ?assertEqual([{certfile, "path/to/cert.pem"}],
+                 wg_push_pack:build_ssl_options(
+                   #wg_push_ssl_options{certfile = "path/to/cert.pem"})),
+    ?assertEqual([{certfile, "path/to/cert.pem"},
+                  {keyfile, "path/to/key.pem"}
+                 ],
+                 lists:sort(
+                   wg_push_pack:build_ssl_options(
+                     #wg_push_ssl_options{certfile = "path/to/cert.pem",
+                                          keyfile = "path/to/key.pem"
+                                         }))),
+    ?assertEqual([{certfile, "path/to/cert.pem"},
+                  {password, "mypass"}
+                 ],
+                 lists:sort(
+                   wg_push_pack:build_ssl_options(
+                     #wg_push_ssl_options{certfile = "path/to/cert.pem",
+                                          password = "mypass"
+                                         }))),
+    ?assertEqual([{certfile, "path/to/cert.pem"},
+                  {key, <<"mykey">>},
+                  {versions, ['tlsv1.1']}
+                 ],
+                 lists:sort(
+                   wg_push_pack:build_ssl_options(
+                     #wg_push_ssl_options{certfile = "path/to/cert.pem",
+                                          key = <<"mykey">>,
+                                          versions = ['tlsv1.1']
+                                         }))),
+    ?assertEqual([{cert, <<"mycert">>},
+                  {key, <<"mykey">>},
+                  {versions, [sslv3, 'tlsv1.2']}
+                 ],
+                 lists:sort(
+                   wg_push_pack:build_ssl_options(
+                     #wg_push_ssl_options{cert = <<"mycert">>,
+                                          key = <<"mykey">>,
+                                          versions = [sslv3, 'tlsv1.2']
+                                         }))),
+
+    ok.

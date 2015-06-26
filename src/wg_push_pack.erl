@@ -8,7 +8,7 @@
 
 -include("wg_push.hrl").
 
--export([pack_items/1, pack_item/1]).
+-export([pack_items/1, pack_item/1, build_ssl_options/1]).
 
 -type(item_error() :: {error, byte(), atom()}).
 
@@ -46,3 +46,18 @@ pack_item(#wg_push_item{id = Id,
 					 5, 1, Priority:8/integer>>,
             {ok, Data}
     end.
+
+
+-spec build_ssl_options(#wg_push_ssl_options{}) -> list().
+build_ssl_options(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile,
+                                       cert = Cert, key = Key,
+                                       password = Password, versions = Versions}) ->
+    lists:filter(fun({_, undefined}) -> false;
+                    (_) -> true
+                 end,
+                 [{certfile, CertFile},
+                  {keyfile, KeyFile},
+                  {cert, Cert},
+                  {key, Key},
+                  {password, Password},
+                  {versions, Versions}]).

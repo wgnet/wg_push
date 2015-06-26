@@ -85,38 +85,40 @@ send_messages(Messages, #wg_push_ssl_options{certfile = CertFile} = SSL_Options,
         {ok, Socket, State2} ->
             case send(Socket, Messages) of
                 ok -> {ok, State2};
-                {error, closed} ->
-                    {{error, closed}, State2#state{connections = orddict:erase(CertFile, Connections)}};
-                {error, ItemID, shutdown} ->
+                {item_error, ItemID, shutdown} ->
                     ssl:close(Socket),
                     NewState = State#state{connections = orddict:erase(CertFile, Connections)},
                     RestMessages = remove_sent_messages(Messages, ItemID),
                     send_messages(RestMessages, SSL_Options, NewState);
-                {error, _ItemID, Reason} ->
+                {item_error, _ItemID, Reason} ->
                     ssl:close(Socket),
-                    {{error, Reason}, State2#state{connections = orddict:erase(CertFile, Connections)}}
+                    {{error, reply, Reason}, State2#state{connections = orddict:erase(CertFile, Connections)}};
+                {error, Stage, Reason} ->
+                    {{error, Stage, Reason}, State2#state{connections = orddict:erase(CertFile, Connections)}}
             end;
         {error, Reason} -> {{error, no_connection, Reason}, State}
     end.
 
+
 -spec get_connection(#wg_push_ssl_options{}, #state{}) -> {ok, port(), #state{}} | {error, term()}.
-get_connection(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile},
+get_connection(#wg_push_ssl_options{certfile = CertFile} = SSL_Options,
                #state{apns_host = Host, apns_port = Port, connections = Connections} = State) ->
     case orddict:find(CertFile, Connections) of
         error ->
-            case open_connection(CertFile, KeyFile, Host, Port) of
+            case open_connection(Host, Port, SSL_Options) of
                 {ok, Socket} ->
                     State2 = State#state{connections = orddict:store(CertFile, Socket, Connections)},
                     {ok, Socket, State2};
                 {error, Reason} -> {error, Reason}
             end;
         {ok, Socket} ->
+            %% TODO try to check socket with ssl:connection_info/1
             case ssl:recv(Socket, 0, 0) of
                 {ok, _} -> {ok, Socket, State};
                 {error, _Reason} ->
                     %% bad socket, reopen
                     ssl:close(Socket),
-                    case open_connection(CertFile, KeyFile, Host, Port) of
+                    case open_connection(Host, Port, SSL_Options) of
                         {ok, NewSocket} ->
                             State2 = State#state{connections = orddict:store(CertFile, NewSocket, Connections)},
                             {ok, NewSocket, State2};
@@ -126,26 +128,17 @@ get_connection(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile},
 
     end.
 
--spec open_connection(file:name_all(), file:name_all() | undefined, list(), integer()) -> {ok, port(), #state{}} | {error, term()}.
-open_connection(CertFile, KeyFile, Host, Port) ->
-    Key = case KeyFile of %% when certfile is a .pem containing cert & key
-        undefined -> CertFile;
-        _         -> KeyFile
-    end,
-	Options = [
-            {certfile, CertFile},
-            {keyfile, Key},
-            {versions,['tlsv1.1']},
-            {active, false},
-            binary
-            ],
+
+-spec open_connection(string(), integer(), #wg_push_ssl_options{}) -> {ok, port()} | {error, term()}.
+open_connection(Host, Port, SSL_Options) ->
+    Options = [{active, true}, binary] ++ wg_push_pack:build_ssl_options(SSL_Options),
     case ssl:connect(Host, Port, Options) of
         {ok, Socket} -> {ok, Socket};
         {error, Reason} -> {error, Reason}
     end.
 
 
--spec send(port(), [#wg_push_item{}]) -> ok | {error, term()}.
+-spec send(port(), [#wg_push_item{}]) -> ok | {error, atom(), term()} | {item_error, integer(), atom()}.
 send(Socket, Messages) ->
     case wg_push_pack:pack_items(Messages) of
         {ok, Bin} ->
@@ -153,11 +146,11 @@ send(Socket, Messages) ->
                 ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
                           {ok, Bin2} -> parse_reply(Bin2);
                           {error, timeout} -> ok; %% Message is sent successfully
-                          {error, Reason} -> {error, Reason}
+                          {error, Reason} -> {error, reply, Reason}
                       end;
-                {error, Reason} -> {error, Reason}
+                {error, Reason} -> {error, send, Reason}
             end;
-        {error, Reason} -> {error, Reason}
+        {error, Reason} -> {error, pack, Reason}
     end.
 
 remove_sent_messages(Messages, ItemID) ->
@@ -167,14 +160,14 @@ remove_sent_messages(Messages, ItemID) ->
     end.
 
 parse_reply(<<8, 0, _ItemID/binary>>) -> ok;
-parse_reply(<<8, 1, ItemID/binary>>) -> {error, ItemID, processing_error};
-parse_reply(<<8, 2, ItemID/binary>>) -> {error, ItemID, missing_device_token};
-parse_reply(<<8, 3, ItemID/binary>>) -> {error, ItemID, missing_topic};
-parse_reply(<<8, 4, ItemID/binary>>) -> {error, ItemID, missing_payload};
-parse_reply(<<8, 5, ItemID/binary>>) -> {error, ItemID, invalid_token_size};
-parse_reply(<<8, 6, ItemID/binary>>) -> {error, ItemID, invalid_topic_size};
-parse_reply(<<8, 7, ItemID/binary>>) -> {error, ItemID, invalid_payload_size};
-parse_reply(<<8, 8, ItemID/binary>>) -> {error, ItemID, invalid_token};
-parse_reply(<<8, 10, ItemID/binary>>) -> {error, ItemID, shutdown}; %% TODO try to send later
-parse_reply(<<8, 255, ItemID/binary>>) -> {error, ItemID, uknown_error};
-parse_reply(_Any) -> {error, unknown_reply}.
+parse_reply(<<8, 1, ItemID/binary>>) -> {item_error, ItemID, processing_error};
+parse_reply(<<8, 2, ItemID/binary>>) -> {item_error, ItemID, missing_device_token};
+parse_reply(<<8, 3, ItemID/binary>>) -> {item_error, ItemID, missing_topic};
+parse_reply(<<8, 4, ItemID/binary>>) -> {item_error, ItemID, missing_payload};
+parse_reply(<<8, 5, ItemID/binary>>) -> {item_error, ItemID, invalid_token_size};
+parse_reply(<<8, 6, ItemID/binary>>) -> {item_error, ItemID, invalid_topic_size};
+parse_reply(<<8, 7, ItemID/binary>>) -> {item_error, ItemID, invalid_payload_size};
+parse_reply(<<8, 8, ItemID/binary>>) -> {item_error, ItemID, invalid_token};
+parse_reply(<<8, 10, ItemID/binary>>) -> {item_error, ItemID, shutdown}; %% TODO try to send later
+parse_reply(<<8, 255, ItemID/binary>>) -> {item_error, ItemID, uknown_error};
+parse_reply(_Any) -> {error, reply, unknown_reply}.

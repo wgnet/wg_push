@@ -3,13 +3,7 @@
 -include("wg_push.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
--export([init/0, send_v0/0, send_v1/0, send_v2/0]).
-
--define(TOKEN,
-        <<1,1,1,1, 1,1,1,1,
-          2,2,2,2, 2,2,2,2,
-          3,3,3,3, 3,3,3,3,
-          4,4,4,4, 4,4,4,4>>).
+-export([init/0, send_v0/1, send_v1/1, send_v2/1, send_v2/2]).
 
 
 %% module API
@@ -32,14 +26,15 @@ init() ->
     ok.
 
 
-send_v0() ->
+send_v0(Token) ->
     {Host, Port} = host_port(),
     SSL_Options = ssl_options(),
-    Msg = msg(),
+    Msg = msg(<<"Hello V0">>),
+    io:format("Send V0 T:~p~nM:~p~nO:~p~n", [Token, Msg, SSL_Options]),
     case ssl:connect(Host, Port, SSL_Options) of
         {ok, Socket} ->
             ok = ssl:send(Socket, <<0, % protocol
-                                    0, 32, ?TOKEN/binary,
+                                    0, 32, Token/binary,
                                     (byte_size(Msg)):16/integer,
                                     Msg/binary>>),
             Res = get_reply(),
@@ -49,16 +44,17 @@ send_v0() ->
     end.
 
 
-send_v1() ->
+send_v1(Token) ->
     {Host, Port} = host_port(),
     SSL_Options = ssl_options(),
-    Msg = msg(),
+    Msg = msg(<<"Hello V1">>),
+    io:format("Send V1 T:~p~nM:~p~nO:~p~n", [Token, Msg, SSL_Options]),
     case ssl:connect(Host, Port, SSL_Options) of
         {ok, Socket} ->
             ok = ssl:send(Socket, <<1, % protocol
                                     0,0,0,1, % identifier
                                     0,0,0,1, % expiration date
-                                    0, 32, ?TOKEN/binary,
+                                    0, 32, Token/binary,
                                     (byte_size(Msg)):16/integer,
                                     Msg/binary>>),
             Res = get_reply(),
@@ -68,15 +64,18 @@ send_v1() ->
     end.
 
 
-send_v2() ->
-    SSL_Options = #wg_push_ssl_options{certfile = "../../tmp/pc.pem",
-                                       keyfile = "../../tmp/pk.pem"},
-    Message = #wg_push_item{id = 1,
-                            device_token = ?TOKEN,
-                            payload = msg(),
-                            expiration_date = 0
-                           },
-    wg_push_sender:send_message(Message, SSL_Options).
+send_v2(Token) -> send_v2(Token, <<"Hello from V2">>).
+
+send_v2(Token, Text) ->
+    SSL_Options = #wg_push_ssl_options{certfile = "../../tmp/keys/cert_1.pem",
+                                       keyfile = "../../tmp/keys/pkey.pem"},
+    Msg = #wg_push_item{id = 1,
+                        device_token = Token,
+                        payload = msg(Text),
+                        expiration_date = 0
+                       },
+    io:format("Send V2 T:~p~nM:~p~nO:~p~n", [Token, Msg, SSL_Options]),
+    wg_push_sender:send_message(Msg, SSL_Options).
 
 
 %%% inner functions
@@ -85,13 +84,14 @@ host_port() -> {"gateway.push.apple.com", 2195}.
 
 
 ssl_options() ->
-    [{certfile, "../../tmp/pc.pem"},
-     {keyfile, "../../tmp/pk.pem"},
+    [{certfile, "../../tmp/keys/cert_1.pem"},
+     {keyfile, "../../tmp/keys/pkey.pem"},
+     {versions, ['tlsv1.1']},
      {active, true},
      binary].
 
 
-msg() -> <<"{\"aps\":{\"alert\":\"Hello\"}}">>.
+msg(Text) -> <<"{\"aps\":{\"alert\":\"", Text/binary, "\"}}">>.
 
 
 get_reply() ->
