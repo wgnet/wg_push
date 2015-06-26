@@ -127,7 +127,7 @@ get_connection(#wg_push_ssl_options{certfile = CertFile} = SSL_Options,
 
 -spec open_connection(string(), integer(), #wg_push_ssl_options{}) -> {ok, port()} | {error, term()}.
 open_connection(Host, Port, SSL_Options) ->
-    Options = [{active, true}, binary] ++ wg_push_pack:build_ssl_options(SSL_Options),
+    Options = [{active, false}, binary] ++ wg_push_pack:build_ssl_options(SSL_Options),
     case ssl:connect(Host, Port, Options) of
         {ok, Socket} -> {ok, Socket};
         {error, Reason} -> {error, Reason}
