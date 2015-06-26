@@ -9,9 +9,9 @@
 
 
 -record(state, {
-          apns_host :: string(),
-          apns_port :: integer(),
-          connections = [] :: {file:name_all(), port()}
+        apns_host :: string(),
+        apns_port :: integer(),
+        connections = orddict:new() :: orddict:orddict(file:name_all(), port())
          }).
 
 
@@ -51,11 +51,7 @@ handle_call({set_apns_host_port, Host, Port}, _From, State) ->
 
 
 handle_call({send_messages, Messages, SSL_Options}, _From, State) ->
-    {Reply, State3} =
-        case get_connection(SSL_Options, State) of
-            {ok, Socket, State2} -> {send(Socket, Messages), State2};
-            {error, Reason} -> {{error, no_connection, Reason}, State}
-        end,
+    {Reply, State3} = send_messages(Messages, SSL_Options, State),
     {reply, Reply, State3};
 
 handle_call(_Any, _From, State) ->
@@ -80,28 +76,72 @@ code_change(_OldVersion, State, _Extra) ->
 
 
 %%% inner functions
+-spec send_messages([#wg_push_item{}], #wg_push_ssl_options{}, #state{}) -> ok | {error, term()}.
+send_messages([], _SSL_Options, State) ->
+    {ok, State};
+send_messages(Messages, #wg_push_ssl_options{certfile = CertFile} = SSL_Options,
+              #state{connections = Connections} = State) ->
+    case get_connection(SSL_Options, State) of
+        {ok, Socket, State2} ->
+            case send(Socket, Messages) of
+                ok -> {ok, State2};
+                {error, closed} ->
+                    {{error, closed}, State2#state{connections = orddict:erase(CertFile, Connections)}};
+                {error, ItemID, shutdown} ->
+                    ssl:close(Socket),
+                    NewState = State#state{connections = orddict:erase(CertFile, Connections)},
+                    RestMessages = remove_sent_messages(Messages, ItemID),
+                    send_messages(RestMessages, SSL_Options, NewState);
+                {error, _ItemID, Reason} ->
+                    ssl:close(Socket),
+                    {{error, Reason}, State2#state{connections = orddict:erase(CertFile, Connections)}}
+            end;
+        {error, Reason} -> {{error, no_connection, Reason}, State}
+    end.
 
 -spec get_connection(#wg_push_ssl_options{}, #state{}) -> {ok, port(), #state{}} | {error, term()}.
 get_connection(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile},
                #state{apns_host = Host, apns_port = Port, connections = Connections} = State) ->
-    case proplists:get_value(CertFile, Connections) of
-        undefined ->
-            Options = [{certfile, CertFile},
-                       {keyfile, KeyFile},
-                       %%{versions,['tlsv1.1']},
-                       {active, false},
-                       binary
-                      ],
-            case ssl:connect(Host, Port, Options) of
+    case orddict:find(CertFile, Connections) of
+        error ->
+            case open_connection(CertFile, KeyFile, Host, Port) of
                 {ok, Socket} ->
-                    State2 = State#state{connections = [{CertFile, Socket} | Connections]},
+                    State2 = State#state{connections = orddict:store(CertFile, Socket, Connections)},
                     {ok, Socket, State2};
                 {error, Reason} -> {error, Reason}
             end;
-        Socket ->
-            %% TODO check Socket is not closed,
-            %% reopen and update State if needed
-            {Socket, State}
+        {ok, Socket} ->
+            case ssl:recv(Socket, 0, 0) of
+                {ok, _} -> {ok, Socket, State};
+                {error, _Reason} ->
+                    %% bad socket, reopen
+                    ssl:close(Socket),
+                    case open_connection(CertFile, KeyFile, Host, Port) of
+                        {ok, NewSocket} ->
+                            State2 = State#state{connections = orddict:store(CertFile, NewSocket, Connections)},
+                            {ok, NewSocket, State2};
+                        {error, Reason} -> {error, Reason}
+                    end
+            end
+
+    end.
+
+-spec open_connection(file:name_all(), file:name_all() | undefined, list(), integer()) -> {ok, port(), #state{}} | {error, term()}.
+open_connection(CertFile, KeyFile, Host, Port) ->
+    Key = case KeyFile of %% when certfile is a .pem containing cert & key
+        undefined -> CertFile;
+        _         -> KeyFile
+    end,
+	Options = [
+            {certfile, CertFile},
+            {keyfile, Key},
+            {versions,['tlsv1.1']},
+            {active, false},
+            binary
+            ],
+    case ssl:connect(Host, Port, Options) of
+        {ok, Socket} -> {ok, Socket};
+        {error, Reason} -> {error, Reason}
     end.
 
 
@@ -111,25 +151,30 @@ send(Socket, Messages) ->
         {ok, Bin} ->
             case ssl:send(Socket, Bin) of
                 ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
-                          {ok, Bin2} -> parse_reply(Bin2); %% TODO close socket and open new one
+                          {ok, Bin2} -> parse_reply(Bin2);
+                          {error, timeout} -> ok; %% Message is sent successfully
                           {error, Reason} -> {error, Reason}
                       end;
-                {error, timeout} -> ok; %% Message is sent successfully
                 {error, Reason} -> {error, Reason}
             end;
         {error, Reason} -> {error, Reason}
     end.
 
+remove_sent_messages(Messages, ItemID) ->
+    case lists:dropwhile(fun(#wg_push_item{id = Id}) -> Id /= ItemID end, Messages) of
+        [] -> [];
+        [_LastSent | T] -> T
+    end.
 
 parse_reply(<<8, 0, _ItemID/binary>>) -> ok;
-parse_reply(<<8, 1, _ItemID/binary>>) -> {error, processing_error};
-parse_reply(<<8, 2, _ItemID/binary>>) -> {error, missing_device_token};
-parse_reply(<<8, 3, _ItemID/binary>>) -> {error, missing_topic};
-parse_reply(<<8, 4, _ItemID/binary>>) -> {error, missing_payload};
-parse_reply(<<8, 5, _ItemID/binary>>) -> {error, invalid_token_size};
-parse_reply(<<8, 6, _ItemID/binary>>) -> {error, invalid_topic_size};
-parse_reply(<<8, 7, _ItemID/binary>>) -> {error, invalid_payload_size};
-parse_reply(<<8, 8, _ItemID/binary>>) -> {error, invalid_token};
-parse_reply(<<8, 10, _ItemID/binary>>) -> {error, shutdown}; %% TODO try to send later
-parse_reply(<<8, 255, _ItemID /binary>>) -> {error, uknown_error};
+parse_reply(<<8, 1, ItemID/binary>>) -> {error, ItemID, processing_error};
+parse_reply(<<8, 2, ItemID/binary>>) -> {error, ItemID, missing_device_token};
+parse_reply(<<8, 3, ItemID/binary>>) -> {error, ItemID, missing_topic};
+parse_reply(<<8, 4, ItemID/binary>>) -> {error, ItemID, missing_payload};
+parse_reply(<<8, 5, ItemID/binary>>) -> {error, ItemID, invalid_token_size};
+parse_reply(<<8, 6, ItemID/binary>>) -> {error, ItemID, invalid_topic_size};
+parse_reply(<<8, 7, ItemID/binary>>) -> {error, ItemID, invalid_payload_size};
+parse_reply(<<8, 8, ItemID/binary>>) -> {error, ItemID, invalid_token};
+parse_reply(<<8, 10, ItemID/binary>>) -> {error, ItemID, shutdown}; %% TODO try to send later
+parse_reply(<<8, 255, ItemID/binary>>) -> {error, ItemID, uknown_error};
 parse_reply(_Any) -> {error, unknown_reply}.
