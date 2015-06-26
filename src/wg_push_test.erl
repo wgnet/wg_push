@@ -13,16 +13,13 @@ init() ->
     %% dbg:p(wg_push_sender, [m]), %% trace all messages to wg_push_sender process
     dbg:p(all, [c]), %% trace function calls
 
-    dbg:tp(wg_push_sender, send_message, cx),
-    %% dbg:tp(wg_push_sender, handle_call, cx),
-    %% dbg:tp(wg_push_sender, handle_cast, cx),
-    dbg:tpl(wg_push_sender, get_connection, cx),
-    dbg:tpl(wg_push_sender, send, cx),
-    dbg:tpl(wg_push_sender, parse_reply, cx),
+    %% dbg:tp(wg_push_sender, send_messages, cx),
+    %% dbg:tpl(wg_push_sender, get_connection, cx),
+    %% dbg:tpl(wg_push_sender, send, cx),
+    %% dbg:tpl(wg_push_sender, parse_reply, cx),
 
-    dbg:tp(wg_push_pack, pack_items, 1, cx),
-
-    %% dbg:tp(ssl, connect, cx),
+    dbg:tp(ssl, send, cx),
+    dbg:tp(ssl, recv, cx),
     ok.
 
 

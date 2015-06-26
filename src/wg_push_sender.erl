@@ -85,7 +85,7 @@ send_messages(Messages, #wg_push_ssl_options{certfile = CertFile} = SSL_Options,
         {ok, Socket, State2} ->
             case send(Socket, Messages) of
                 ok -> {ok, State2};
-                {item_error, ItemID, shutdown} ->
+                {item_error, ItemID, shutdown} -> %% TODO exponential backoff needed
                     ssl:close(Socket),
                     NewState = State#state{connections = orddict:erase(CertFile, Connections)},
                     RestMessages = remove_sent_messages(Messages, ItemID),
@@ -103,29 +103,25 @@ send_messages(Messages, #wg_push_ssl_options{certfile = CertFile} = SSL_Options,
 -spec get_connection(#wg_push_ssl_options{}, #state{}) -> {ok, port(), #state{}} | {error, term()}.
 get_connection(#wg_push_ssl_options{certfile = CertFile} = SSL_Options,
                #state{apns_host = Host, apns_port = Port, connections = Connections} = State) ->
-    case orddict:find(CertFile, Connections) of
-        error ->
+    Res = case orddict:find(CertFile, Connections) of
+              error -> need_new_socket;
+              {ok, Socket} ->
+                  case ssl:connection_info(Socket) of
+                      {ok, _} -> {ok, Socket, State};
+                      {error, _Reason} ->
+                          ssl:close(Socket),
+                          need_new_socket
+                  end
+          end,
+    case Res of
+        {ok, OldSocket} -> {ok, OldSocket, State};
+        need_new_socket ->
             case open_connection(Host, Port, SSL_Options) of
-                {ok, Socket} ->
-                    State2 = State#state{connections = orddict:store(CertFile, Socket, Connections)},
-                    {ok, Socket, State2};
+                {ok, NewSocket} ->
+                    State2 = State#state{connections = orddict:store(CertFile, NewSocket, Connections)},
+                    {ok, NewSocket, State2};
                 {error, Reason} -> {error, Reason}
-            end;
-        {ok, Socket} ->
-            %% TODO try to check socket with ssl:connection_info/1
-            case ssl:recv(Socket, 0, 0) of
-                {ok, _} -> {ok, Socket, State};
-                {error, _Reason} ->
-                    %% bad socket, reopen
-                    ssl:close(Socket),
-                    case open_connection(Host, Port, SSL_Options) of
-                        {ok, NewSocket} ->
-                            State2 = State#state{connections = orddict:store(CertFile, NewSocket, Connections)},
-                            {ok, NewSocket, State2};
-                        {error, Reason} -> {error, Reason}
-                    end
             end
-
     end.
 
 
@@ -168,6 +164,6 @@ parse_reply(<<8, 5, ItemID/binary>>) -> {item_error, ItemID, invalid_token_size}
 parse_reply(<<8, 6, ItemID/binary>>) -> {item_error, ItemID, invalid_topic_size};
 parse_reply(<<8, 7, ItemID/binary>>) -> {item_error, ItemID, invalid_payload_size};
 parse_reply(<<8, 8, ItemID/binary>>) -> {item_error, ItemID, invalid_token};
-parse_reply(<<8, 10, ItemID/binary>>) -> {item_error, ItemID, shutdown}; %% TODO try to send later
+parse_reply(<<8, 10, ItemID/binary>>) -> {item_error, ItemID, shutdown};
 parse_reply(<<8, 255, ItemID/binary>>) -> {item_error, ItemID, uknown_error};
 parse_reply(_Any) -> {error, reply, unknown_reply}.
