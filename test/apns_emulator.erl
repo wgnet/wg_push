@@ -1,6 +1,6 @@
 -module(apns_emulator).
 
--export([start/0]).
+-export([start/0, client_session/1]).
 
 
 start() ->
@@ -14,33 +14,35 @@ start_server() ->
     Port = 2195,
     SSL_Options = [{certfile, "server.crt"},
                    {keyfile, "server.key"},
-                   {reuseaddr, true}],
+                   {reuseaddr, true},
+                   {active, false},
+                   binary],
     io:format("start apns_emulator ~p at port:~p~n", [self(), Port]),
     {ok, ListenSocket} = ssl:listen(Port, SSL_Options),
-    wait_for_client(ListenSocket).
+    spawn(?MODULE, client_session, [ListenSocket]),
+    timer:sleep(infinity).
 
 
-wait_for_client(ListenSocket) ->
-    io:format("~p emulator wait for client~n", [self()]),
+client_session(ListenSocket) ->
+    io:format("~p client_session~n", [self()]),
     {ok, Socket} = ssl:transport_accept(ListenSocket),
-    io:format("~p handshake~n", [self()]),
     ok = ssl:ssl_accept(Socket),
     io:format("~p client accepted~n", [self()]),
-    receive_data(),
-    ssl:close(Socket),
-    wait_for_client(ListenSocket).
-
-
-receive_data() ->
-    io:format("~p wait for data~n", [self()]),
-    receive
-        {ssl, _, Data} ->
-            io:format("~p server got data:~p~n", [self(), Data]),
-            receive_data();
-        {ssl_closed, _} ->
-            io:format("~p client close connection ~n", [self()]),
-            ok
-    end.
+    spawn(?MODULE, client_session, [ListenSocket]),
+    {ok, <<2, PacketSize:32/integer>>} = ssl:recv(Socket, 5, 1000),
+    {ok, Data} = ssl:recv(Socket, PacketSize, 1000),
+    io:format("~p got data:~p~n", [self(), Data]),
+    <<1, 0, 32, _Token:32/binary,
+      2, Size:16/integer, Payload:(Size)/binary,
+      3, 4, MessageId:32/integer,
+      _Rest/binary>> = Data,
+    io:format("~p MessageId:~p Payload:~p~n", [self(), MessageId, Payload]),
+    case MessageId of
+        20 -> ok;
+        ErrorCode -> ssl:send(Socket, <<8, ErrorCode:8/integer, MessageId:32/integer>>)
+    end,
+    timer:sleep(300),
+    ssl:close(Socket).
 
 
 start_feedback() ->

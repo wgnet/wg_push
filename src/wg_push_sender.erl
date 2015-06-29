@@ -85,12 +85,18 @@ send_messages(Messages, #wg_push_ssl_options{certfile = CertFile} = SSL_Options,
         {ok, Socket, State2} ->
             case send(Socket, Messages) of
                 ok -> {ok, State2};
-                {item_error, ItemID, shutdown} -> %% TODO exponential backoff needed
+                {item_error, ItemID, shutdown} ->
+                    %% TODO need exponential backoff
+                    %% Should it be done at library level or at user code level?
                     ssl:close(Socket),
                     NewState = State#state{connections = orddict:erase(CertFile, Connections)},
                     RestMessages = remove_sent_messages(Messages, ItemID),
                     send_messages(RestMessages, SSL_Options, NewState);
                 {item_error, _ItemID, Reason} ->
+                    %% TODO need separate result for each message.
+                    %% Messages before ItemID are sent successfully
+                    %% Message with ItemID failed with Reason
+                    %% Messages after ItemID were not sent.
                     ssl:close(Socket),
                     {{error, reply, Reason}, State2#state{connections = orddict:erase(CertFile, Connections)}};
                 {error, Stage, Reason} ->
@@ -107,7 +113,7 @@ get_connection(#wg_push_ssl_options{certfile = CertFile} = SSL_Options,
               error -> need_new_socket;
               {ok, Socket} ->
                   case ssl:connection_info(Socket) of
-                      {ok, _} -> {ok, Socket, State};
+                      {ok, _} -> {ok, Socket};
                       {error, _Reason} ->
                           ssl:close(Socket),
                           need_new_socket
@@ -141,7 +147,7 @@ send(Socket, Messages) ->
             case ssl:send(Socket, Bin) of
                 ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
                           {ok, Bin2} -> parse_reply(Bin2);
-                          {error, timeout} -> ok; %% Message is sent successfully
+                          {error, timeout} -> ok; %% Messages are sent successfully
                           {error, Reason} -> {error, reply, Reason}
                       end;
                 {error, Reason} -> {error, send, Reason}

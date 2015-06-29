@@ -3,7 +3,7 @@
 -include("wg_push.hrl").
 -include_lib("stdlib/include/ms_transform.hrl").
 
--export([init/0, send_v0/1, send_v1/1, send_v2/1, send_v2/2]).
+-export([init/0, send_v0/1, send_v1/1, send_v2/1, send_v2/2, send_v2_local/0]).
 
 
 %% module API
@@ -73,6 +73,27 @@ send_v2(Token, Text) ->
                        },
     io:format("Send V2 T:~p~nM:~p~nO:~p~n", [Token, Msg, SSL_Options]),
     wg_push_sender:send_message(Msg, SSL_Options).
+
+
+send_v2_local() ->
+    SSL_Options = #wg_push_ssl_options{certfile = "test/server.crt",
+                                       keyfile = "test/server.key"},
+    Token = <<1,1,1,1, 1,1,1,1,
+              2,2,2,2, 2,2,2,2,
+              3,3,3,3, 3,3,3,3,
+              4,4,4,4, 4,4,4,4>>,
+    Msg1 = #wg_push_item{id = 20,
+                         device_token = Token,
+                         payload = msg(<<"Hello">>),
+                         expiration_date = 0
+                        },
+    Msg2 = #wg_push_item{id = 2,
+                         device_token = Token,
+                         payload = msg(<<"Hello again">>),
+                         expiration_date = 0
+                        },
+    wg_push_sender:set_apns_host_port("localhost", 2195),
+    wg_push_sender:send_messages([Msg1, Msg2], SSL_Options).
 
 
 %%% inner functions
