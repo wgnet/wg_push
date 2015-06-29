@@ -5,8 +5,11 @@
 -export([get_feedback/2]).
 
 
+-spec get_feedback({string(), integer()}, #wg_push_ssl_options{}) ->
+                          {ok, [{integer(), binary()}]} | {error, term()}.
 get_feedback({Host, Port}, SSL_Options) ->
-    case ssl:connect(Host, Port, SSL_Options) of
+    Options = [{active, true}, binary] ++ wg_push_pack:build_ssl_options(SSL_Options),
+    case ssl:connect(Host, Port, Options) of
         {ok, Socket} -> Data = read_reply([]),
                         ssl:close(Socket),
                         Tokens = parse_tokens(Data, []),
@@ -23,6 +26,7 @@ read_reply(Data) ->
     end.
 
 
+-spec parse_tokens(binary(), list()) -> [{integer(), binary()}].
 parse_tokens(Data, Tokens) ->
     case Data of
         <<Time:32, Size:16/integer, Token:Size/binary, Rest/binary>> ->

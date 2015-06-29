@@ -41,9 +41,11 @@ read_data(Socket) ->
       3, 4, MessageId:32/integer,
       _Rest/binary>> = Data,
     io:format("~p MessageId:~p Payload:~p~n", [self(), MessageId, Payload]),
-    case MessageId of
-        20 -> ok;
-        ErrorCode -> ssl:send(Socket, <<8, ErrorCode:8/integer, MessageId:32/integer>>)
+    if
+        MessageId > 10 andalso MessageId /= 255 -> ok;
+        true ->
+            ErrorCode = MessageId,
+            ssl:send(Socket, <<8, ErrorCode:8/integer, MessageId:32/integer>>)
     end,
     read_data(Socket).
 

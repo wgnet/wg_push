@@ -44,7 +44,8 @@ end_per_testcase(_, Config) ->
 %%% Tests
 
 check_ssl_connection(_Config) ->
-    Res = ssl:connect("localhost", 2195, ssl_options()),
+    Options = wg_push_pack:build_ssl_options(ssl_options()),
+    Res = ssl:connect("localhost", 2195, Options),
     ct:pal("ssl connection: ~p", [Res]),
     {ok, Socket} = Res,
     ssl:close(Socket),
@@ -52,8 +53,7 @@ check_ssl_connection(_Config) ->
 
 
 apns_push(_Config) ->
-    SSL_Options = #wg_push_ssl_options{certfile = "../../test/server.crt",
-                                       keyfile = "../../test/server.key"},
+    SSL_Options = ssl_options(),
     Token = <<1,1,1,1, 1,1,1,1, 2,2,2,2, 2,2,2,2,
               3,3,3,3, 3,3,3,3, 4,4,4,4, 4,4,4,4>>,
     Payload = <<"{\"aps\":{\"alert\":\"Hello\"}}">>,
@@ -88,8 +88,8 @@ apns_push(_Config) ->
     {error, reply, invalid_topic_size} = wg_push_sender:send_message(Msg1#wg_push_item{id = 6}, SSL_Options),
     {error, reply, invalid_payload_size} = wg_push_sender:send_message(Msg1#wg_push_item{id = 7}, SSL_Options),
     {error, reply, invalid_token} = wg_push_sender:send_message(Msg1#wg_push_item{id = 8}, SSL_Options),
+    {error, reply, unknown_reply} = wg_push_sender:send_message(Msg1#wg_push_item{id = 9}, SSL_Options),
     {error, reply, unknown_error} = wg_push_sender:send_message(Msg1#wg_push_item{id = 255}, SSL_Options),
-    {error, reply, unknown_reply} = wg_push_sender:send_message(Msg1#wg_push_item{id = 77}, SSL_Options),
 
     ok.
 
@@ -119,4 +119,5 @@ ssl_options() ->
     KeyFile = "../../test/server.key",
     {ok, _} = file:read_file(CertFile),
     {ok, _} = file:read_file(KeyFile),
-    [{certfile, CertFile}, {keyfile, KeyFile}].
+    #wg_push_ssl_options{certfile = CertFile,
+                         keyfile = KeyFile}.
