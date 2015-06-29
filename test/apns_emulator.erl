@@ -29,7 +29,11 @@ client_session(ListenSocket) ->
     ok = ssl:ssl_accept(Socket),
     io:format("~p client accepted~n", [self()]),
     spawn(?MODULE, client_session, [ListenSocket]),
-    {ok, <<2, PacketSize:32/integer>>} = ssl:recv(Socket, 5, 1000),
+    read_data(Socket).
+
+
+read_data(Socket) ->
+    {ok, <<2, PacketSize:32/integer>>} = ssl:recv(Socket, 5),
     {ok, Data} = ssl:recv(Socket, PacketSize, 1000),
     io:format("~p got data:~p~n", [self(), Data]),
     <<1, 0, 32, _Token:32/binary,
@@ -41,8 +45,7 @@ client_session(ListenSocket) ->
         20 -> ok;
         ErrorCode -> ssl:send(Socket, <<8, ErrorCode:8/integer, MessageId:32/integer>>)
     end,
-    timer:sleep(300),
-    ssl:close(Socket).
+    read_data(Socket).
 
 
 start_feedback() ->

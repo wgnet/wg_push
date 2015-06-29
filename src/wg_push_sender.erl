@@ -26,12 +26,12 @@ set_apns_host_port(Host, Port) ->
     gen_server:call(?MODULE, {set_apns_host_port, Host, Port}).
 
 
--spec send_message(#wg_push_item{}, #wg_push_ssl_options{}) -> ok | {error, term()}.
+-spec send_message(#wg_push_item{}, #wg_push_ssl_options{}) -> ok | {error, atom(), term()}.
 send_message(Message, SSL_Options) ->
     send_messages([Message], SSL_Options).
 
 
--spec send_messages([#wg_push_item{}], #wg_push_ssl_options{}) -> ok | {error, term()}.
+-spec send_messages([#wg_push_item{}], #wg_push_ssl_options{}) -> ok | {error, atom(), term()}.
 send_messages(Messages, SSL_Options) ->
     gen_server:call(?MODULE, {send_messages, Messages, SSL_Options}).
 
@@ -76,7 +76,8 @@ code_change(_OldVersion, State, _Extra) ->
 
 
 %%% inner functions
--spec send_messages([#wg_push_item{}], #wg_push_ssl_options{}, #state{}) -> ok | {error, term()}.
+-spec send_messages([#wg_push_item{}], #wg_push_ssl_options{}, #state{}) ->
+                           {ok, #state{}} | {{error, atom(), term()}, #state{}}.
 send_messages([], _SSL_Options, State) ->
     {ok, State};
 send_messages(Messages, #wg_push_ssl_options{certfile = CertFile} = SSL_Options,
@@ -152,7 +153,7 @@ send(Socket, Messages) ->
                       end;
                 {error, Reason} -> {error, send, Reason}
             end;
-        {error, Reason} -> {error, pack, Reason}
+        {error, _ItemId, Reason} -> {error, pack, Reason}
     end.
 
 remove_sent_messages(Messages, ItemID) ->
@@ -171,5 +172,5 @@ parse_reply(<<8, 6, ItemID/binary>>) -> {item_error, ItemID, invalid_topic_size}
 parse_reply(<<8, 7, ItemID/binary>>) -> {item_error, ItemID, invalid_payload_size};
 parse_reply(<<8, 8, ItemID/binary>>) -> {item_error, ItemID, invalid_token};
 parse_reply(<<8, 10, ItemID/binary>>) -> {item_error, ItemID, shutdown};
-parse_reply(<<8, 255, ItemID/binary>>) -> {item_error, ItemID, uknown_error};
+parse_reply(<<8, 255, ItemID/binary>>) -> {item_error, ItemID, unknown_error};
 parse_reply(_Any) -> {error, reply, unknown_reply}.

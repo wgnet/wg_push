@@ -10,7 +10,7 @@
 
 -export([pack_items/1, pack_item/1, build_ssl_options/1]).
 
--type(item_error() :: {error, byte(), atom()}).
+-type(item_error() :: {error, integer(), atom()}).
 
 -spec pack_items([#wg_push_item{}]) -> {ok, binary()} | item_error() | {error, no_data}.
 pack_items(Items) ->
