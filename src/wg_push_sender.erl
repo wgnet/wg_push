@@ -149,6 +149,7 @@ send(Socket, Messages) ->
                 ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
                           {ok, Bin2} -> parse_reply(Bin2);
                           {error, timeout} -> ok; %% Messages are sent successfully
+                          {error, closed} -> ok;  %% Messages are sent successfully
                           {error, Reason} -> {error, reply, Reason}
                       end;
                 {error, Reason} -> {error, send, Reason}
