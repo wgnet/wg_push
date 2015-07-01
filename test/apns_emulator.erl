@@ -38,7 +38,7 @@ read_data(Socket) ->
     io:format("~p got data:~p~n", [self(), Data]),
     <<1, 0, 32, _Token:32/binary,
       2, Size:16/integer, Payload:(Size)/binary,
-      3, 4, MessageId:32/integer,
+      3, 0, 4, MessageId:32/integer,
       _Rest/binary>> = Data,
     io:format("~p MessageId:~p Payload:~p~n", [self(), MessageId, Payload]),
     if

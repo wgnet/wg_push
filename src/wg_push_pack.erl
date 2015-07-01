@@ -41,9 +41,9 @@ pack_item(#wg_push_item{id = Id,
         true ->
             Data = <<1, 0, 32, DeviceToken/binary,
 					 2, (byte_size(Payload)):16/integer, Payload/binary,
-					 3, 4, Id:32/integer,
-					 4, 4, EDate:32/integer,
-					 5, 1, Priority:8/integer>>,
+					 3, 0, 4, Id:32/integer,
+					 4, 0, 4, EDate:32/integer,
+					 5, 0, 1, Priority:8/integer>>,
             {ok, Data}
     end.
 

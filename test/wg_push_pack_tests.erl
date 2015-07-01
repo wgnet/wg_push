@@ -22,9 +22,9 @@ pack_item_test() ->
     Bin = <<1,
             0, 32, DeviceToken/binary,
             2, Size:16/integer, Payload/binary,
-            3, 4, Id:32/integer,
-            4, 4, EDate:32/integer,
-            5, 1, Priority:8/integer>>,
+            3, 0, 4, Id:32/integer,
+            4, 0, 4, EDate:32/integer,
+            5, 0, 1, Priority:8/integer>>,
     ?assertEqual({ok, Bin}, wg_push_pack:pack_item(Item)),
 
     InvalidToken = <<1,2,3>>,
