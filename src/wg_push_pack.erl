@@ -9,6 +9,7 @@
 -include("wg_push.hrl").
 
 -export([pack_items/1, pack_item/1, build_ssl_options/1]).
+-export([encode_aps/1, encode_alert/1]).
 
 -type(item_error() :: {error, integer(), atom()}).
 
@@ -32,9 +33,10 @@ pack_items([Item | Rest], Data) ->
 -spec pack_item(#wg_push_item{}) -> {ok, binary()} | item_error().
 pack_item(#wg_push_item{id = Id,
                         device_token = DeviceToken,
-                        payload = Payload,
+                        payload = PayloadData,
                         expiration_date = EDate,
                         priority = Priority}) ->
+    Payload = encode_payload(PayloadData),
     if
         byte_size(Payload) > 2048 -> {error, Id, payload_too_big};
         byte_size(DeviceToken) /= 32 -> {error, Id, invalid_device_token};
@@ -61,3 +63,53 @@ build_ssl_options(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile,
                   {key, Key},
                   {password, Password},
                   {versions, Versions}]).
+
+-spec encode_payload(#wg_push_aps{} | binary()) -> binary().
+encode_payload(Payload) when is_binary(Payload) -> Payload;
+encode_payload(Payload) when is_record(Payload, wg_push_aps) -> encode_aps(Payload).
+
+-spec encode_aps(#wg_push_aps{}) -> binary().
+encode_aps(#wg_push_aps{alert = Alert, badge = Badge, sound = Sound, content_available = CA, data = undefined}) ->
+    Props = [
+        {alert, encode_alert(Alert)},
+        {badge, Badge},
+        {sound, Sound},
+        {'content-available', CA}
+    ],
+    jiffy:encode({[{aps, {remove_empty(Props)}}]});
+encode_aps(#wg_push_aps{alert = Alert, badge = Badge, sound = Sound, content_available = CA, data = Data}) ->
+    Props = [
+        {alert, encode_alert(Alert)},
+        {badge, Badge},
+        {sound, Sound},
+        {'content-available', CA}
+    ],
+    Q = {lists:concat([[{aps, {remove_empty(Props)}}], Data])},
+    jiffy:encode(Q).
+
+-spec encode_alert(#wg_push_alert{} | binary()) -> proplists:proplist().
+encode_alert(Alert) when is_binary(Alert) -> Alert;
+encode_alert(#wg_push_alert{title = Title, body = Body, title_loc_key = TLK, title_loc_args = TLA,
+    action_loc_key = ALK, loc_key = LK, loc_args = LA, launch_image = LI}) ->
+    Props = [
+        {title, Title},
+        {body, Body},
+        {'title-loc-key', TLK},
+        {'title-loc-args', TLA},
+        {'action-loc-key', ALK},
+        {'loc-key', LK},
+        {'loc-args', LA},
+        {'launch-image', LI}
+    ],
+    {remove_empty(Props)}.
+
+-spec remove_empty(proplists:proplist()) -> proplists:proplist().
+remove_empty(Props) ->
+    remove_empty(Props, []).
+
+-spec remove_empty(proplists:proplist(), []) -> proplists:proplist().
+remove_empty([], Acc) -> Acc;
+remove_empty([{_K, []} | T], Acc) -> remove_empty(T, Acc);
+remove_empty([{_K, undefined} | T], Acc) -> remove_empty(T, Acc);
+remove_empty([{_K, <<"">> }| T], Acc) -> remove_empty(T, Acc);
+remove_empty([Tuple | T], Acc) -> remove_empty(T, [Tuple | Acc]).

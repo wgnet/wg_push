@@ -7,12 +7,15 @@
          init_per_suite/1, end_per_suite/1,
          init_per_testcase/2, end_per_testcase/2,
          check_ssl_connection/1,
-         apns_push/1, feedback/1
+         apns_push/1, feedback/1,
+         encode_aps/1, encode_alert/1
         ]).
 
 all() -> [check_ssl_connection,
           apns_push,
-          feedback
+          feedback,
+          encode_aps,
+          encode_alert
          ].
 
 
@@ -109,6 +112,55 @@ feedback(_Config) ->
     Tokens = wg_push_feedback:get_feedback({"localhost", 2196}, ssl_options()),
     ct:pal("Tokens:~p", [Tokens]),
     {ok, [{Timestamp2, Token2}, {Timestamp1, Token1}]} = Tokens,
+    ok.
+
+encode_aps(_Config) ->
+    P1 = #wg_push_aps{
+        alert = #wg_push_alert{title = <<"T1">>, body = <<"B1">>},
+        badge = 1,
+        sound = <<"q">>
+    },
+    R1 = <<"{\"aps\":{\"sound\":\"q\",\"badge\":1,\"alert\":{\"body\":\"B1\",\"title\":\"T1\"}}}">>,
+    R1 = wg_push_pack:encode_aps(P1),
+
+    P2 = #wg_push_aps{
+        alert = <<"A">>,
+        badge = 1,
+        sound = <<"q">>
+    },
+    R2 = <<"{\"aps\":{\"sound\":\"q\",\"badge\":1,\"alert\":\"A\"}}">>,
+    R2 = wg_push_pack:encode_aps(P2),
+
+    P3 = #wg_push_aps{
+        alert = <<"A">>,
+        badge = 1,
+        sound = <<"q">>,
+        data = [{q, <<"b">>}, {w, 17}]
+    },
+    R3 = <<"{\"aps\":{\"sound\":\"q\",\"badge\":1,\"alert\":\"A\"},\"q\":\"b\",\"w\":17}">>,
+    R3 = wg_push_pack:encode_aps(P3),
+
+    P4 = #wg_push_aps{
+        alert = #wg_push_alert{title = <<"T1">>, body = <<"B1">>, title_loc_args = [<<"a">>, <<"b">>, <<"c">>]},
+        badge = 1,
+        sound = <<"q">>
+    },
+    R4 = <<"{\"aps\":{\"sound\":\"q\",\"badge\":1,\"alert\":{\"title-loc-args\":[\"a\",\"b\",\"c\"],\"body\":\"B1\",\"title\":\"T1\"}}}">>,
+    R4 = wg_push_pack:encode_aps(P4),
+
+    ok.
+
+encode_alert(_Config) ->
+    A1 = #wg_push_alert{title = <<"T1">>, body = <<"B1">>},
+    E1 = [{body, <<"B1">>}, {title, <<"T1">>}],
+    {R1} = wg_push_pack:encode_alert(A1),
+    E1 = lists:sort(R1),
+
+    A2 = #wg_push_alert{title = <<"T1">>, body = <<"B1">>, loc_args = [<<"1">>, <<"2">>]},
+    E2 = [{body, <<"B1">>}, {'loc-args', [<<"1">>, <<"2">>]}, {title, <<"T1">>}],
+    {R2} = wg_push_pack:encode_alert(A2),
+    E2 = lists:sort(R2),
+
     ok.
 
 

@@ -174,4 +174,7 @@ parse_reply(<<8, 7, ItemID/binary>>) -> {item_error, ItemID, invalid_payload_siz
 parse_reply(<<8, 8, ItemID/binary>>) -> {item_error, ItemID, invalid_token};
 parse_reply(<<8, 10, ItemID/binary>>) -> {item_error, ItemID, shutdown};
 parse_reply(<<8, 255, ItemID/binary>>) -> {item_error, ItemID, unknown_error};
-parse_reply(_Any) -> {error, reply, unknown_reply}.
+parse_reply(Any) ->
+    io:format("Reply is unknown: ~p~n", [Any]),
+    {error, reply, unknown_reply}.
+

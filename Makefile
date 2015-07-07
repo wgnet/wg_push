@@ -15,4 +15,4 @@ d:
 	dialyzer --src -I include src
 
 run:
-	erl -pa ebin -s wg_push_app start
+	erl -pa ebin -pz deps/jiffy/ebin -s wg_push_app start
