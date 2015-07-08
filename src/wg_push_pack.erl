@@ -66,7 +66,7 @@ build_ssl_options(#wg_push_ssl_options{certfile = CertFile, keyfile = KeyFile,
 
 -spec encode_payload(#wg_push_aps{} | binary()) -> binary().
 encode_payload(Payload) when is_binary(Payload) -> Payload;
-encode_payload(Payload) when is_record(Payload, wg_push_aps) -> encode_aps(Payload).
+encode_payload(Payload)                         -> encode_aps(Payload).
 
 -spec encode_aps(#wg_push_aps{}) -> binary().
 encode_aps(#wg_push_aps{alert = Alert, badge = Badge, sound = Sound, content_available = CA, data = Data}) ->
@@ -102,4 +102,9 @@ encode_alert(#wg_push_alert{title = Title, body = Body, title_loc_key = TLK, tit
 
 -spec remove_empty(proplists:proplist()) -> proplists:proplist().
 remove_empty(Props) ->
-    lists:filtermap(fun ({_K, V}) -> V /= [] andalso V /= undefined andalso V /= <<"">> end, Props).
+    F = fun({_K, []})           -> false;
+           ({_K, undefined})    -> false;
+           ({_K, <<"">>})       -> false;
+           (_)                  -> true
+    end,
+    lists:filtermap(F, Props).
