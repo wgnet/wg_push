@@ -134,3 +134,52 @@ build_ssl_options_test() ->
                                          }))),
 
     ok.
+
+encode_aps_test() ->
+    P1 = #wg_push_aps{
+        alert = #wg_push_alert{title = <<"T1">>, body = <<"B1">>},
+        badge = 1,
+        sound = <<"q">>
+    },
+    R1 = <<"{\"aps\":{\"alert\":{\"title\":\"T1\",\"body\":\"B1\"},\"badge\":1,\"sound\":\"q\"}}">>,
+    ?assertEqual(R1, wg_push_pack:encode_aps(P1)),
+
+    P2 = #wg_push_aps{
+        alert = <<"A">>,
+        badge = 1,
+        sound = <<"q">>
+    },
+    R2 = <<"{\"aps\":{\"alert\":\"A\",\"badge\":1,\"sound\":\"q\"}}">>,
+    ?assertEqual(R2, wg_push_pack:encode_aps(P2)),
+
+    P3 = #wg_push_aps{
+        alert = <<"A">>,
+        badge = 1,
+        sound = <<"q">>,
+        data = [{q, <<"b">>}, {w, 17}]
+    },
+    R3 = <<"{\"aps\":{\"alert\":\"A\",\"badge\":1,\"sound\":\"q\"},\"q\":\"b\",\"w\":17}">>,
+    ?assertEqual(R3, wg_push_pack:encode_aps(P3)),
+
+    P4 = #wg_push_aps{
+        alert = #wg_push_alert{title = <<"T1">>, body = <<"B1">>, title_loc_args = [<<"a">>, <<"b">>, <<"c">>]},
+        badge = 1,
+        sound = <<"q">>
+    },
+    R4 = <<"{\"aps\":{\"alert\":{\"title\":\"T1\",\"body\":\"B1\",\"title-loc-args\":[\"a\",\"b\",\"c\"]},\"badge\":1,\"sound\":\"q\"}}">>,
+    ?assertEqual(R4, wg_push_pack:encode_aps(P4)),
+
+    ok.
+
+encode_alert_test() ->
+    A1 = #wg_push_alert{title = <<"T1">>, body = <<"B1">>},
+    E1 = [{body, <<"B1">>}, {title, <<"T1">>}],
+    {R1} = wg_push_pack:encode_alert(A1),
+    ?assertEqual(E1, lists:sort(R1)),
+
+    A2 = #wg_push_alert{title = <<"T1">>, body = <<"B1">>, loc_args = [<<"1">>, <<"2">>]},
+    E2 = [{body, <<"B1">>}, {'loc-args', [<<"1">>, <<"2">>]}, {title, <<"T1">>}],
+    {R2} = wg_push_pack:encode_alert(A2),
+    ?assertEqual(E2, lists:sort(R2)),
+
+    ok.

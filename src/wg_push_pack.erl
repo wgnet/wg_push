@@ -69,14 +69,6 @@ encode_payload(Payload) when is_binary(Payload) -> Payload;
 encode_payload(Payload) when is_record(Payload, wg_push_aps) -> encode_aps(Payload).
 
 -spec encode_aps(#wg_push_aps{}) -> binary().
-encode_aps(#wg_push_aps{alert = Alert, badge = Badge, sound = Sound, content_available = CA, data = undefined}) ->
-    Props = [
-        {alert, encode_alert(Alert)},
-        {badge, Badge},
-        {sound, Sound},
-        {'content-available', CA}
-    ],
-    jiffy:encode({[{aps, {remove_empty(Props)}}]});
 encode_aps(#wg_push_aps{alert = Alert, badge = Badge, sound = Sound, content_available = CA, data = Data}) ->
     Props = [
         {alert, encode_alert(Alert)},
@@ -84,8 +76,12 @@ encode_aps(#wg_push_aps{alert = Alert, badge = Badge, sound = Sound, content_ava
         {sound, Sound},
         {'content-available', CA}
     ],
-    Q = {lists:concat([[{aps, {remove_empty(Props)}}], Data])},
-    jiffy:encode(Q).
+    case Data of
+        undefined   ->
+            jiffy:encode({[{aps, {remove_empty(Props)}}]});
+        _           ->
+            jiffy:encode({lists:concat([[{aps, {remove_empty(Props)}}], Data])})
+    end.
 
 -spec encode_alert(#wg_push_alert{} | binary()) -> proplists:proplist().
 encode_alert(Alert) when is_binary(Alert) -> Alert;
@@ -103,13 +99,7 @@ encode_alert(#wg_push_alert{title = Title, body = Body, title_loc_key = TLK, tit
     ],
     {remove_empty(Props)}.
 
+
 -spec remove_empty(proplists:proplist()) -> proplists:proplist().
 remove_empty(Props) ->
-    remove_empty(Props, []).
-
--spec remove_empty(proplists:proplist(), []) -> proplists:proplist().
-remove_empty([], Acc) -> Acc;
-remove_empty([{_K, []} | T], Acc) -> remove_empty(T, Acc);
-remove_empty([{_K, undefined} | T], Acc) -> remove_empty(T, Acc);
-remove_empty([{_K, <<"">> }| T], Acc) -> remove_empty(T, Acc);
-remove_empty([Tuple | T], Acc) -> remove_empty(T, [Tuple | Acc]).
+    lists:filtermap(fun ({_K, V}) -> V /= [] andalso V /= undefined andalso V /= <<"">> end, Props).
