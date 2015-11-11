@@ -7,6 +7,8 @@
   {applications, [kernel, stdlib]},
   {mod, {wg_push_app, []}},
   {env, [{apns_host, "gateway.sandbox.push.apple.com"},
-         {apns_port, 2195}
+         {apns_port, 2195},
+         {wait_apns_reply_timeout, 200}, % milliseconds
+         {wait_feedback_reply_timeout, 200} % milliseconds
         ]}
  ]}.

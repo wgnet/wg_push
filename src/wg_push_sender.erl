@@ -146,12 +146,14 @@ send(Socket, Messages) ->
     case wg_push_pack:pack_items(Messages) of
         {ok, Bin} ->
             case ssl:send(Socket, Bin) of
-                ok -> case ssl:recv(Socket, 6, 200) of %% TODO what timeout is better to use here?
-                          {ok, Bin2} -> parse_reply(Bin2);
-                          {error, timeout} -> ok; %% Messages are sent successfully
-                          {error, closed} -> ok;  %% Messages are sent successfully
-                          {error, Reason} -> {error, reply, Reason}
-                      end;
+                ok ->
+                    {ok, Timeout} = application:get_env(wg_push, wait_apns_reply_timeout),
+                    case ssl:recv(Socket, 6, Timeout) of
+                        {ok, Bin2} -> parse_reply(Bin2);
+                        {error, timeout} -> ok; %% Messages are sent successfully
+                        {error, closed} -> ok;  %% Messages are sent successfully
+                        {error, Reason} -> {error, reply, Reason}
+                    end;
                 {error, Reason} -> {error, send, Reason}
             end;
         {error, _ItemId, Reason} -> {error, pack, Reason}
@@ -175,4 +177,3 @@ parse_reply(<<8, 8, ItemID/binary>>) -> {item_error, ItemID, invalid_token};
 parse_reply(<<8, 10, ItemID/binary>>) -> {item_error, ItemID, shutdown};
 parse_reply(<<8, 255, ItemID/binary>>) -> {item_error, ItemID, unknown_error};
 parse_reply(_) -> {error, reply, unknown_reply}.
-

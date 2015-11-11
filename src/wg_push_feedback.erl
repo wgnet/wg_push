@@ -20,9 +20,11 @@ get_feedback({Host, Port}, SSL_Options) ->
 
 -spec read_reply(list()) -> binary().
 read_reply(Data) ->
+    {ok, Timeout} = application:get_env(wg_push, wait_feedback_reply_timeout),
     receive
         {ssl, _, Part} -> read_reply([Part|Data]);
         {ssl_closed, _} -> list_to_binary(lists:reverse(Data))
+    after Timeout -> Data
     end.
 
 
