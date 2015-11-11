@@ -113,7 +113,7 @@ get_connection(#wg_push_ssl_options{certfile = CertFile} = SSL_Options,
     Res = case orddict:find(CertFile, Connections) of
               error -> need_new_socket;
               {ok, Socket} ->
-                  case ssl:connection_info(Socket) of
+                  case ssl:connection_information(Socket) of
                       {ok, _} -> {ok, Socket};
                       {error, _Reason} ->
                           ssl:close(Socket),

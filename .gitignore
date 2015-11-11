@@ -6,3 +6,5 @@ ebin
 TAGS
 .idea
 .rebar
+_build
+rebar.lock
